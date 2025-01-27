@@ -8,7 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="ClientFiles\" />
+    <Compile Remove="ClientFiles\**" />
+    <EmbeddedResource Remove="ClientFiles\**" />
+    <None Remove="ClientFiles\**" />
   </ItemGroup>
 
 </Project>

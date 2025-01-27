@@ -10,18 +10,13 @@ namespace Server.Src
             var localIp = "IP not found";
             try
             {
-                var host = Dns.GetHostEntry(Dns.GetHostName());
-                foreach (var ip in host.AddressList)
-                {
-                    if (ip.AddressFamily != AddressFamily.InterNetwork)
-                        continue;
-                    localIp = ip.ToString();
-                    break;
-                }
+                localIp = Dns.GetHostAddresses(Dns.GetHostName())
+                    .FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
+                    ?.ToString() ?? "IP not found";
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error to get ip {ex.Message}");
+                Console.WriteLine($"Error to get IP: {ex.Message}");
             }
             return localIp;
         }

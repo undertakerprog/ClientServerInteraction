@@ -4,7 +4,7 @@ namespace Server
 {
     public static class CommandProcessor
     {
-        private const string ServerDirectory = @"../../../ServerFiles";
+        private static readonly string ServerDirectory = Path.Combine(Environment.CurrentDirectory, "ServerFiles");
         public static string ProcessCommand(string command, TcpClient client)
         {
             var stream = client.GetStream();
@@ -84,10 +84,15 @@ namespace Server
                     return "Error: No file name provided.\r\n";
                 }
 
+                if (!Directory.Exists(ServerDirectory))
+                {
+                    Directory.CreateDirectory(ServerDirectory);
+                }
+
                 var filePath = Path.Combine(ServerDirectory, fileName);
 
                 var buffer = new byte[8];
-                stream.Read(buffer, 0, buffer.Length);
+                stream.ReadExactly(buffer, 0, buffer.Length);
                 var fileSize = BitConverter.ToInt64(buffer, 0);
 
                 Console.WriteLine($"Receiving file: {fileName} ({fileSize} bytes)");
@@ -119,22 +124,29 @@ namespace Server
             }
         }
 
-
         private static string GetFileList(string serverDirectory)
         {
-            if (!Directory.Exists(serverDirectory))
+            try
             {
-                return "Error: Server directory not found.";
-            }
+                if (!Directory.Exists(serverDirectory))
+                {
+                    Directory.CreateDirectory(serverDirectory);
+                }
+                var files = Directory.GetFiles(serverDirectory);
+                if (files.Length == 0)
+                {
+                    return "No files found in the server directory.";
+                }
 
-            var files = Directory.GetFiles(serverDirectory);
-            if (files.Length == 0)
+                var fileList = string.Join("\n", files.Select(Path.GetFileName));
+                return $"Files on server:\n{fileList}";
+            }
+            catch (Exception ex)
             {
-                return "No files found in the server directory.";
+                Console.WriteLine($"Error accessing or creating directory: {ex.Message}");
+                return "Error: Could not access or create server directory.\r\n";
             }
-
-            var fileList = string.Join("\n", files.Select(Path.GetFileName));
-            return $"Files on server:\n{fileList}";
         }
+
     }
 }

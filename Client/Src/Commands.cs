@@ -6,7 +6,7 @@ namespace Client.Src
     public class Commands
     {
         private const int BufferSize = 1024;
-        private const string ClientDirectory = @"../../../ClientFiles";
+        private static readonly string ClientDirectory = Path.Combine(AppContext.BaseDirectory, "ClientFiles");
 
         public static void ProcessCommand(string command, NetworkStream stream)
         {
@@ -59,6 +59,12 @@ namespace Client.Src
 
         private static void DownloadFile(string fileName, NetworkStream stream)
         {
+            if (!Directory.Exists(ClientDirectory))
+            {
+                Directory.CreateDirectory(ClientDirectory);
+                Console.WriteLine($"Directory {ClientDirectory} created.");
+            }
+
             var filePath = Path.Combine(ClientDirectory, fileName);
 
             try
@@ -98,10 +104,12 @@ namespace Client.Src
             }
         }
 
-
-        private static void UploadFile(string fileName, NetworkStream stream)
+        private static void UploadFile(string filePath, NetworkStream stream)
         {
-            var filePath = Path.Combine(ClientDirectory, fileName);
+            if (!Path.IsPathRooted(filePath))
+            {
+                filePath = Path.Combine(ClientDirectory, filePath);
+            }
 
             if (!File.Exists(filePath))
             {
@@ -111,6 +119,7 @@ namespace Client.Src
 
             try
             {
+                var fileName = Path.GetFileName(filePath);
                 var fileInfo = new FileInfo(filePath);
                 var fileSize = fileInfo.Length;
 
