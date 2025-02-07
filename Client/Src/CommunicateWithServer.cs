@@ -8,7 +8,13 @@ namespace Client.Src
         {
             while (true)
             {
-                Console.Write("Commands - ECHO <message>/TIME/LIST/UPLOAD <file/filepath>/DOWNLOAD <file>/CLOSE/EXIT/QUIT\nEnter command: ");
+                Console.Write("Commands:\n" +
+                              "1.ECHO <message>\n" +
+                              "2.TIME\n" +
+                              "3.LIST\n" +
+                              "4.UPLOAD <file/filepath>\n" +
+                              "5.DOWNLOAD <file>\n" +
+                              "6.CLOSE/EXIT/QUIT\nEnter command: ");
                 var command = Console.ReadLine()?.Trim();
                 if (string.IsNullOrWhiteSpace(command))
                     continue;

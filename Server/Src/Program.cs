@@ -20,7 +20,8 @@ namespace Server.Src
             while (true)
             {
                 var client = listener.AcceptTcpClient();
-                Console.WriteLine("Client was connected");
+                var clientEndPoint = client.Client.RemoteEndPoint?.ToString();
+                Console.WriteLine($"Client was connected({clientEndPoint})");
 
                 var clientHandler = new ClientHandler(client);
                 clientHandler.HandleClient();

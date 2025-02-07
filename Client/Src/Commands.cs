@@ -57,51 +57,43 @@ namespace Client.Src
             }
         }
 
-        private static void DownloadFile(string fileName, NetworkStream stream)
+        public static void DownloadFile(string fileName, NetworkStream stream)
         {
-            if (!Directory.Exists(ClientDirectory))
-            {
-                Directory.CreateDirectory(ClientDirectory);
-                Console.WriteLine($"Directory {ClientDirectory} created.");
-            }
-
             var filePath = Path.Combine(ClientDirectory, fileName);
+            long startByte = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
 
-            try
+            var command = $"DOWNLOAD {fileName} {startByte}\r\n";
+            var commandBytes = Encoding.UTF8.GetBytes(command);
+            stream.Write(commandBytes, 0, commandBytes.Length);
+
+            var buffer = new byte[8];
+            int bytesRead = 0, totalBytesRead = 0;
+
+            while (totalBytesRead < 8)
             {
-                var command = $"DOWNLOAD {fileName}\r\n";
-                var commandBytes = Encoding.UTF8.GetBytes(command);
-                stream.Write(commandBytes, 0, commandBytes.Length);
-
-                var buffer = new byte[8];
-                var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                var fileSize = BitConverter.ToInt64(buffer, 0);
-                Console.WriteLine($"Downloading file: {fileName} ({fileSize} bytes)");
-
-                using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
-                var fileBuffer = new byte[1024];
-                long totalBytesReceived = 0;
-                var startTime = DateTime.Now;
-
-                while (totalBytesReceived < fileSize)
-                {
-                    bytesRead = stream.Read(fileBuffer, 0, fileBuffer.Length);
-                    fileStream.Write(fileBuffer, 0, bytesRead);
-                    totalBytesReceived += bytesRead;
-                }
-
-                var elapsedTime = DateTime.Now - startTime;
-                var bitRate = totalBytesReceived / elapsedTime.TotalSeconds;
-
-                Console.WriteLine($"File downloaded successfully. Bit-rate: {bitRate:F2} bytes/second");
-
-                var response = ReceiveResponse(stream);
-                Console.WriteLine($"Server response after download: {response}");
+                bytesRead = stream.Read(buffer, totalBytesRead, 8 - totalBytesRead);
+                if (bytesRead == 0)
+                    throw new Exception("Connection closed unexpectedly.");
+                totalBytesRead += bytesRead;
             }
-            catch (Exception ex)
+
+            var fileSize = BitConverter.ToInt64(buffer, 0);
+            using var fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write);
+
+            var fileBuffer = new byte[1024];
+            var totalBytesReceived = startByte;
+
+            while (totalBytesReceived < fileSize)
             {
-                Console.WriteLine($"Error during file download: {ex.Message}");
+                bytesRead = stream.Read(fileBuffer, 0, fileBuffer.Length);
+                if (bytesRead == 0)
+                    break;
+
+                fileStream.Write(fileBuffer, 0, bytesRead);
+                totalBytesReceived += bytesRead;
             }
+
+            Console.WriteLine($"File downloaded successfully: {fileName}");
         }
 
         private static void UploadFile(string filePath, NetworkStream stream)

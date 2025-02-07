@@ -13,4 +13,8 @@
     <None Remove="ServerFiles\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ClientInfoLibrary\ClientInfoLibrary.csproj" />
+  </ItemGroup>
+
 </Project>
