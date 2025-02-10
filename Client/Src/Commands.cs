@@ -60,9 +60,9 @@ namespace Client.Src
         public static void DownloadFile(string fileName, NetworkStream stream)
         {
             var filePath = Path.Combine(ClientDirectory, fileName);
-            long startByte = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
+            var startByte = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
 
-            var command = $"DOWNLOAD {fileName} {startByte}\r\n";
+            var command = $"DOWNLOAD {fileName} {startByte/1024}Kb\r\n";
             var commandBytes = Encoding.UTF8.GetBytes(command);
             stream.Write(commandBytes, 0, commandBytes.Length);
 

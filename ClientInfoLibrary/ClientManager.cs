@@ -23,11 +23,6 @@ namespace ClientInfoLibrary
                 });
         }
 
-        public ClientInfo? GetClientInfo(string ipAddress)
-        {
-            return _clients.GetValueOrDefault(ipAddress);
-        }
-
         private void CleanupInactiveClients(object? state)
         {
             var cutoff = DateTime.Now - TimeSpan.FromMinutes(2);
