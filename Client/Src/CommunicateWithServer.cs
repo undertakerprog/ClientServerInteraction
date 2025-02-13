@@ -1,6 +1,4 @@
-﻿using ClientInfoLibrary;
-using System.Net.Sockets;
-using System.Text;
+﻿using System.Net.Sockets;
 
 namespace Client.Src
 {
@@ -35,35 +33,5 @@ namespace Client.Src
                 }
             }
         }
-
-        public static void CheckResumableFiles(NetworkStream stream)
-        {
-            var buffer = new byte[1024];
-            var bytesRead = stream.Read(buffer, 0, buffer.Length);
-            var message = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
-
-            if (message == "skip")
-            {
-                return;
-            }
-
-            Console.WriteLine(message);
-
-            Console.Write("Enter answer (yes/no): ");
-            var answer = Console.ReadLine()?.Trim().ToLower();
-
-            var responseBytes = Encoding.UTF8.GetBytes(answer + "\r\n");
-            stream.Write(responseBytes, 0, responseBytes.Length);
-
-            if (answer == "yes")
-            {
-                Console.WriteLine("Continue working...");
-            }
-            else
-            {
-                Console.WriteLine("Don't continue working...");
-            }
-        }
-
     }
 }

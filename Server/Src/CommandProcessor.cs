@@ -34,7 +34,7 @@ namespace Server
         private static string HandleFileReceived(string ipAddress, string fileName)
         {
             ClientManager.SetClientActive(ipAddress);
-            return $"Received file confirmation from client for {fileName}.\r\n";
+            return string.Empty;
         }
 
         private static string DownloadFile(string fileName, NetworkStream stream, string ipAddress, long startByte = 0)

@@ -23,7 +23,8 @@ namespace Server.Src
             {
                 var client = listener.AcceptTcpClient();
                 var clientEndPoint = client.Client.RemoteEndPoint?.ToString();
-                Console.WriteLine($"Client was connected({clientEndPoint})");
+                var ipAddress = clientEndPoint!.Split(':')[0];
+                Console.WriteLine($"Client was connected({ipAddress})");
 
                 var clientHandler = new ClientHandler(client);
                 clientHandler.HandleClient();
