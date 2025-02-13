@@ -62,7 +62,7 @@ namespace Client.Src
             var filePath = Path.Combine(ClientDirectory, fileName);
             var startByte = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
 
-            var command = $"DOWNLOAD {fileName} {startByte/1024}Kb\r\n";
+            var command = $"DOWNLOAD {fileName} {startByte / 1024}Kb\r\n";
             var commandBytes = Encoding.UTF8.GetBytes(command);
             stream.Write(commandBytes, 0, commandBytes.Length);
 
@@ -94,7 +94,75 @@ namespace Client.Src
             }
 
             Console.WriteLine($"File downloaded successfully: {fileName}");
+
+            var confirmationMessage = $"FILE_RECEIVED {fileName}\r\n";
+            var confirmationBytes = Encoding.UTF8.GetBytes(confirmationMessage);
+            stream.Write(confirmationBytes, 0, confirmationBytes.Length);
         }
+
+
+        //public static void DownloadFile(string fileName, NetworkStream stream)
+        //{
+        //    var filePath = Path.Combine(ClientDirectory, fileName);
+
+        //    if (File.Exists(filePath))
+        //    {
+        //        Console.Write($"File {fileName} already exists. Do you want to overwrite it? (y/n): ");
+        //        var userInput = Console.ReadLine()?.Trim().ToLower();
+
+        //        if (userInput != "y")
+        //        {
+        //            Console.WriteLine("File download cancelled.");
+        //            return;
+        //        }
+
+        //        try
+        //        {
+        //            File.Delete(filePath);
+        //            Console.WriteLine($"Old file {fileName} deleted.");
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            Console.WriteLine($"Error deleting old file {fileName}: {ex.Message}");
+        //            return;
+        //        }
+        //    }
+
+        //    var startByte = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
+
+        //    var command = $"DOWNLOAD {fileName} {startByte / 1024}Kb\r\n";
+        //    var commandBytes = Encoding.UTF8.GetBytes(command);
+        //    stream.Write(commandBytes, 0, commandBytes.Length);
+
+        //    var buffer = new byte[8];
+        //    int bytesRead = 0, totalBytesRead = 0;
+
+        //    while (totalBytesRead < 8)
+        //    {
+        //        bytesRead = stream.Read(buffer, totalBytesRead, 8 - totalBytesRead);
+        //        if (bytesRead == 0)
+        //            throw new Exception("Connection closed unexpectedly.");
+        //        totalBytesRead += bytesRead;
+        //    }
+
+        //    var fileSize = BitConverter.ToInt64(buffer, 0);
+        //    using var fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write);
+
+        //    var fileBuffer = new byte[1024];
+        //    var totalBytesReceived = startByte;
+
+        //    while (totalBytesReceived < fileSize)
+        //    {
+        //        bytesRead = stream.Read(fileBuffer, 0, fileBuffer.Length);
+        //        if (bytesRead == 0)
+        //            break;
+
+        //        fileStream.Write(fileBuffer, 0, bytesRead);
+        //        totalBytesReceived += bytesRead;
+        //    }
+
+        //    Console.WriteLine($"File downloaded successfully: {fileName}");
+        //}
 
         private static void UploadFile(string filePath, NetworkStream stream)
         {

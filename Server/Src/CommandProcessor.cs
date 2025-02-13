@@ -25,9 +25,16 @@ namespace Server
                 "LIST" => GetFileList(ServerDirectory),
                 "UPLOAD" => UploadFile(argument, stream),
                 "DOWNLOAD" => DownloadFile(argument, stream, ipAddress, startByte),
+                "FILE_RECEIVED" => HandleFileReceived(ipAddress, argument),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
+        }
+
+        private static string HandleFileReceived(string ipAddress, string fileName)
+        {
+            ClientManager.SetClientActive(ipAddress);
+            return $"Received file confirmation from client for {fileName}.\r\n";
         }
 
         private static string DownloadFile(string fileName, NetworkStream stream, string ipAddress, long startByte = 0)
@@ -64,7 +71,6 @@ namespace Server
 
                     ClientManager.AddOrUpdateClient(ipAddress, fileName, totalBytesSent);
                 }
-
                 return $"File {fileName} downloaded successfully.\r\n";
             }
             catch (Exception ex)

@@ -15,6 +15,8 @@ namespace Server.Src
             var listener = new TcpListener(IPAddress.Any, port);
             listener.Start();
 
+            File.Delete("clients.json");
+
             Console.WriteLine($"Server was create {localIp}:{port}. Wait for connections");
 
             while (true)

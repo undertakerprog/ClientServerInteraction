@@ -1,5 +1,6 @@
 ﻿using System.Net.Sockets;
 using System.Text;
+using ClientInfoLibrary;
 
 namespace Client.Src
 {
@@ -16,10 +17,13 @@ namespace Client.Src
 
             try
             {
-                using var client = new TcpClient(serverIp, port);
+                using var client = new TcpClient(serverIp!, port);
                 Console.WriteLine("Connected to server");
 
                 var stream = client.GetStream();
+
+                CommunicateWithServer.CheckResumableFiles(stream);
+
                 CommunicateWithServer.Communicate(stream);
             }
             catch (Exception ex)
