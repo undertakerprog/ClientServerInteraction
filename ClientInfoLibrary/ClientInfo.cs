@@ -1,12 +1,12 @@
 ﻿namespace ClientInfoLibrary
 {
-    public class ClientInfo(string ipAddress, string fileName, long downloadedBytes)
+    public class ClientInfo()
     {
-        public string IpAddress { get; set;  } = ipAddress;
-        public string FileName { get; set; } = fileName;
-        public long DownloadedBytes { get; set; } = downloadedBytes;
-        public DateTime LastActivity { get; private set; } = DateTime.Now;
-        public bool CanResumeDownload { get; set; }
+        public string IpAddress { get; set;  } = "Unknown";
+        public string FileName { get; set; } = "No File";
+        public long DownloadedBytes { get; set; } = 0;
+        public DateTime LastActivity { get; set; } = DateTime.MinValue;
+        public bool CanResumeDownload { get; set; } = true;
 
         public void UpdateActivity(string ipAddress, string fileName, long downloadedBytes)
         {
@@ -14,17 +14,17 @@
             FileName = fileName;
             DownloadedBytes = downloadedBytes;
             LastActivity = DateTime.Now;
-            CanResumeDownload = false;
+            CanResumeDownload = true;
         }
 
         public void MarkInactive()
         {
-            CanResumeDownload = true;
+            CanResumeDownload = false;
         }
 
         public void MarkActive()
         {
-            CanResumeDownload = false;
+            CanResumeDownload = true;
         }
     }
 }

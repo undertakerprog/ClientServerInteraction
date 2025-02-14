@@ -5,10 +5,9 @@ namespace Server
 {
     public static class CommandProcessor
     {
-        private static readonly ClientManager ClientManager = new();
         private static readonly string ServerDirectory = Path.Combine(Environment.CurrentDirectory, "ServerFiles");
 
-        public static string ProcessCommand(string command, TcpClient client)
+        public static string ProcessCommand(string command, TcpClient client, ClientManager clientManager)
         {
             var stream = client.GetStream();
             var parts = command.Split(' ', 3);
@@ -24,20 +23,20 @@ namespace Server
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
                 "UPLOAD" => UploadFile(argument, stream),
-                "DOWNLOAD" => DownloadFile(argument, stream, ipAddress, startByte),
-                "FILE_RECEIVED" => HandleFileReceived(ipAddress, argument),
+                "DOWNLOAD" => DownloadFile(argument, stream, ipAddress, clientManager, startByte),
+                "FILE_RECEIVED" => HandleFileReceived(ipAddress, argument, clientManager),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
         }
 
-        private static string HandleFileReceived(string ipAddress, string fileName)
+        private static string HandleFileReceived(string ipAddress, string fileName, ClientManager clientManager)
         {
-            ClientManager.SetClientActive(ipAddress);
+            clientManager.SetClientActive(ipAddress);
             return string.Empty;
         }
 
-        private static string DownloadFile(string fileName, NetworkStream stream, string ipAddress, long startByte = 0)
+        private static string DownloadFile(string fileName, NetworkStream stream, string ipAddress, ClientManager clientManager, long startByte = 0)
         {
             try
             {
@@ -51,7 +50,7 @@ namespace Server
                 var fileInfo = new FileInfo(filePath);
                 var fileSize = fileInfo.Length;
 
-                ClientManager.AddOrUpdateClient(ipAddress, fileName, startByte);
+                clientManager.AddOrUpdateClient(ipAddress, fileName, startByte);
 
                 var sizeBytes = BitConverter.GetBytes(fileSize);
                 stream.Write(sizeBytes, 0, sizeBytes.Length);
@@ -69,8 +68,9 @@ namespace Server
                     stream.Write(buffer, 0, bytesRead);
                     totalBytesSent += bytesRead;
 
-                    ClientManager.AddOrUpdateClient(ipAddress, fileName, totalBytesSent);
+                    clientManager.AddOrUpdateClient(ipAddress, fileName, totalBytesSent);
                 }
+                clientManager.ClearClientData(ipAddress);
                 return $"File {fileName} downloaded successfully.\r\n";
             }
             catch (Exception ex)

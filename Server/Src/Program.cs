@@ -27,7 +27,7 @@ namespace Server.Src
                 Console.WriteLine($"Client was connected({ipAddress})");
 
                 var clientHandler = new ClientHandler(client);
-                clientHandler.HandleClient();
+                clientHandler.HandleClient(ipAddress);
             }
         }
     }

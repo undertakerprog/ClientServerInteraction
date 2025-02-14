@@ -8,12 +8,12 @@ namespace ClientInfoLibrary
     {
         private readonly ConcurrentDictionary<string, ClientInfo> _clients = new();
         private readonly ConcurrentDictionary<string, Timer> _timers = new();
-        private const int TimeOutClient = 3000;
+        private const int TimeOutClient = 30000;
 
         public void AddOrUpdateClient(string ipAddress, string fileName, long downloadedBytes)
         {
             _clients.AddOrUpdate(ipAddress,
-                _ => new ClientInfo(ipAddress, fileName, downloadedBytes),
+                _ => new ClientInfo { IpAddress = ipAddress, FileName = fileName, DownloadedBytes = downloadedBytes },
                 (_, existingClient) =>
                 {
                     existingClient.UpdateActivity(ipAddress, fileName, downloadedBytes);
@@ -31,9 +31,24 @@ namespace ClientInfoLibrary
             StopTimer(ipAddress);
         }
 
+        public string GetFileName(string ipAddress)
+        {
+            return _clients.TryGetValue(ipAddress, out var clientInfo) ? clientInfo.FileName : "No File";
+        }
+
+
         public bool CanDownloadFile(string ipAddress)
         {
             return _clients.TryGetValue(ipAddress, out var clientInfo) && clientInfo.CanResumeDownload;
+        }
+
+        public void ClearClientData(string ipAddress)
+        {
+            if (!_clients.TryGetValue(ipAddress, out var clientInfo)) return;
+            clientInfo.FileName = "No File";
+            clientInfo.DownloadedBytes = 0;
+            clientInfo.LastActivity = DateTime.MinValue;
+            clientInfo.CanResumeDownload = true;
         }
 
         private void StopTimer(string ipAddress)
@@ -65,11 +80,7 @@ namespace ClientInfoLibrary
             if (!_clients.TryGetValue(ipAddress, out var clientInfo))
                 return;
 
-            Console.WriteLine(clientInfo.CanResumeDownload);
-
             clientInfo.MarkInactive();
-
-            Console.WriteLine(clientInfo.CanResumeDownload);
         }
     }
 }

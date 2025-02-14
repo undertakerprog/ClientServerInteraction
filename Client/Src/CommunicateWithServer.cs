@@ -1,4 +1,5 @@
 ﻿using System.Net.Sockets;
+using System.Text;
 
 namespace Client.Src
 {
@@ -6,6 +7,11 @@ namespace Client.Src
     {
         public static void Communicate(NetworkStream stream)
         {
+            if (!ReceiveAndRespondToServerPrompt(stream))
+            {
+                Console.WriteLine("Exiting program...");
+            }
+
             while (true)
             {
                 Console.Write("Commands:\n" +
@@ -32,6 +38,28 @@ namespace Client.Src
                     Console.WriteLine($"Error: {ex.Message}");
                 }
             }
+        }
+
+        private static bool ReceiveAndRespondToServerPrompt(NetworkStream stream)
+        {
+            var buffer = new byte[1024];
+            var bytesRead = stream.Read(buffer, 0, buffer.Length);
+            var message = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+
+            if (message == "skip")
+            {
+                Console.WriteLine("Skipping prompt...");
+                return true;
+            }
+
+            Console.WriteLine(message);
+            Console.Write("Enter your response (yes/no): ");
+            var response = Console.ReadLine()?.Trim().ToLower() ?? "no";
+
+            var responseBytes = Encoding.UTF8.GetBytes(response + "\r\n");
+            stream.Write(responseBytes, 0, responseBytes.Length);
+
+            return response == "yes";
         }
     }
 }
