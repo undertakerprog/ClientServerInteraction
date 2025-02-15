@@ -51,11 +51,8 @@ namespace Client.Src
                         else
                         {
                             DownloadFile(argument, stream);
-
-
-
-                            var downloadResponse = ReceiveResponse(stream);
-                            Console.WriteLine($"Server response: {downloadResponse}");
+                            var serverResponse = ReceiveResponse(stream);
+                            Console.WriteLine($"Server response: {serverResponse}");
                         }
                         break;
 
@@ -66,48 +63,84 @@ namespace Client.Src
             }
         }
 
-        public static void DownloadFile(string fileName, NetworkStream stream)
+        private static void DownloadFile(string fileName, NetworkStream stream)
         {
-            var filePath = Path.Combine(ClientDirectory, fileName);
-            var startByte = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
-
-            var command = $"DOWNLOAD {fileName} {startByte / 1024}Kb\r\n";
-            var commandBytes = Encoding.UTF8.GetBytes(command);
-            stream.Write(commandBytes, 0, commandBytes.Length);
-
-            var buffer = new byte[8];
-            int bytesRead = 0, totalBytesRead = 0;
-
-            while (totalBytesRead < 8)
+            try
             {
-                bytesRead = stream.Read(buffer, totalBytesRead, 8 - totalBytesRead);
-                if (bytesRead == 0)
-                    throw new Exception("Connection closed unexpectedly.");
-                totalBytesRead += bytesRead;
+                if (string.IsNullOrWhiteSpace(fileName))
+                {
+                    Console.WriteLine("Error: No file name provided.");
+                    return;
+                }
+
+                // Убедимся, что папка `ClientDirectory` существует
+                if (!Directory.Exists(ClientDirectory))
+                {
+                    Directory.CreateDirectory(ClientDirectory);
+                }
+
+                var command = $"DOWNLOAD {fileName}\r\n";
+                var commandBytes = Encoding.UTF8.GetBytes(command);
+                stream.Write(commandBytes, 0, commandBytes.Length);
+                stream.Flush();
+
+                var sizeBuffer = new byte[8];
+                if (!ReadExactly(stream, sizeBuffer, 8))
+                {
+                    Console.WriteLine("Error: Failed to read file size.");
+                    return;
+                }
+
+                var fileSize = BitConverter.ToInt64(sizeBuffer, 0);
+                if (fileSize <= 0)
+                {
+                    Console.WriteLine("Error: File not found or empty.");
+                    return;
+                }
+
+                Console.WriteLine($"Receiving file: {fileName} ({fileSize} bytes)");
+
+                var savePath = Path.Combine(ClientDirectory, fileName);
+                using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write);
+                var receivedBytes = 0L;
+                var buffer = new byte[2048];
+
+                while (receivedBytes < fileSize)
+                {
+                    var bytesRead = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, fileSize - receivedBytes));
+                    if (bytesRead == 0)
+                    {
+                        Console.WriteLine("Error: Connection lost during download.");
+                        return;
+                    }
+
+                    fileStream.Write(buffer, 0, bytesRead);
+                    receivedBytes += bytesRead;
+                }
+
+                Console.WriteLine($"Downloading file: {fileName} ({fileSize} bytes)");
             }
-
-            var fileSize = BitConverter.ToInt64(buffer, 0);
-            using var fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write);
-
-            var fileBuffer = new byte[1024];
-            var totalBytesReceived = startByte;
-
-            while (totalBytesReceived < fileSize)
+            catch (Exception ex)
             {
-                bytesRead = stream.Read(fileBuffer, 0, fileBuffer.Length);
-                if (bytesRead == 0)
-                    break;
-
-                fileStream.Write(fileBuffer, 0, bytesRead);
-                totalBytesReceived += bytesRead;
+                Console.WriteLine($"Error downloading file: {ex.Message}");
             }
-
-            Console.WriteLine($"File downloaded successfully: {fileName}");
-
-            var confirmationMessage = $"FILE_RECEIVED {fileName}\r\n";
-            var confirmationBytes = Encoding.UTF8.GetBytes(confirmationMessage);
-            stream.Write(confirmationBytes, 0, confirmationBytes.Length);
         }
+
+
+        private static bool ReadExactly(NetworkStream stream, byte[] buffer, int count)
+        {
+            var totalRead = 0;
+            while (totalRead < count)
+            {
+                var bytesRead = stream.Read(buffer, totalRead, count - totalRead);
+                if (bytesRead == 0)
+                    return false;
+
+                totalRead += bytesRead;
+            }
+            return true;
+        }
+
 
         private static void UploadFile(string filePath, NetworkStream stream)
         {
@@ -139,20 +172,12 @@ namespace Client.Src
 
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
                 var buffer = new byte[1024];
-                var totalBytesSent = 0L;
-                var startTime = DateTime.Now;
 
                 int bytesRead;
                 while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     stream.Write(buffer, 0, bytesRead);
-                    totalBytesSent += bytesRead;
                 }
-
-                var elapsedTime = DateTime.Now - startTime;
-                var bitRate = totalBytesSent / elapsedTime.TotalSeconds;
-
-                Console.WriteLine($"File uploaded successfully. Bit-rate: {bitRate:F2} bytes/second");
             }
             catch (Exception ex)
             {

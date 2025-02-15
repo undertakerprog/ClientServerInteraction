@@ -4,15 +4,13 @@
     {
         public string IpAddress { get; set;  } = "Unknown";
         public string FileName { get; set; } = "No File";
-        public long DownloadedBytes { get; set; } = 0;
         public DateTime LastActivity { get; set; } = DateTime.MinValue;
         public bool CanResumeDownload { get; set; } = true;
 
-        public void UpdateActivity(string ipAddress, string fileName, long downloadedBytes)
+        public void UpdateActivity(string ipAddress, string fileName)
         {
             IpAddress = ipAddress;
             FileName = fileName;
-            DownloadedBytes = downloadedBytes;
             LastActivity = DateTime.Now;
             CanResumeDownload = true;
         }

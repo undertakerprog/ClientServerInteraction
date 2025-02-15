@@ -7,10 +7,7 @@ namespace Client.Src
     {
         public static void Communicate(NetworkStream stream)
         {
-            if (!ReceiveAndRespondToServerPrompt(stream))
-            {
-                Console.WriteLine("Exiting program...");
-            }
+            ReceiveAndRespondToServerPrompt(stream);
 
             while (true)
             {
@@ -48,11 +45,10 @@ namespace Client.Src
 
             if (message == "skip")
             {
-                Console.WriteLine("Skipping prompt...");
                 return true;
             }
 
-            Console.WriteLine(message);
+            Console.WriteLine($"File available for download: {message}");
             Console.Write("Enter your response (yes/no): ");
             var response = Console.ReadLine()?.Trim().ToLower() ?? "no";
 

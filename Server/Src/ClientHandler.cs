@@ -13,19 +13,17 @@ namespace Server
             var stream = client.GetStream();
             var buffer = new byte[1024];
 
-            Console.WriteLine(ClientManager.CanDownloadFile(ipAddress));
-            Console.WriteLine(ClientManager.GetFileName(ipAddress));
-
             if (ClientManager.CanDownloadFile(ipAddress) && ClientManager.GetFileName(ipAddress) != "No File")
             {
-                if (!AskClientToContinue(stream))
-                {
-                    Console.WriteLine("Client declined to continue. Connection closed.");
-                }
+                var fileName = ClientManager.GetFileName(ipAddress) + "\r\n";
+                var fileNameBytes = Encoding.UTF8.GetBytes(fileName);
+                stream.Write(fileNameBytes, 0, fileNameBytes.Length);
+
+                AskClientToContinue(stream);
             }
             else
             {
-                var skipMessage = Encoding.UTF8.GetBytes("skip\r\n");
+                var skipMessage = "skip\r\n"u8.ToArray();
                 stream.Write(skipMessage, 0, skipMessage.Length);
             }
 

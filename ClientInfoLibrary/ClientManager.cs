@@ -8,15 +8,15 @@ namespace ClientInfoLibrary
     {
         private readonly ConcurrentDictionary<string, ClientInfo> _clients = new();
         private readonly ConcurrentDictionary<string, Timer> _timers = new();
-        private const int TimeOutClient = 30000;
+        private const int TimeOutClient = 90000;
 
-        public void AddOrUpdateClient(string ipAddress, string fileName, long downloadedBytes)
+        public void AddOrUpdateClient(string ipAddress, string fileName)
         {
             _clients.AddOrUpdate(ipAddress,
-                _ => new ClientInfo { IpAddress = ipAddress, FileName = fileName, DownloadedBytes = downloadedBytes },
+                _ => new ClientInfo { IpAddress = ipAddress, FileName = fileName },
                 (_, existingClient) =>
                 {
-                    existingClient.UpdateActivity(ipAddress, fileName, downloadedBytes);
+                    existingClient.UpdateActivity(ipAddress, fileName);
                     ResetTimer(ipAddress);
                     return existingClient;
                 });
@@ -36,19 +36,9 @@ namespace ClientInfoLibrary
             return _clients.TryGetValue(ipAddress, out var clientInfo) ? clientInfo.FileName : "No File";
         }
 
-
         public bool CanDownloadFile(string ipAddress)
         {
             return _clients.TryGetValue(ipAddress, out var clientInfo) && clientInfo.CanResumeDownload;
-        }
-
-        public void ClearClientData(string ipAddress)
-        {
-            if (!_clients.TryGetValue(ipAddress, out var clientInfo)) return;
-            clientInfo.FileName = "No File";
-            clientInfo.DownloadedBytes = 0;
-            clientInfo.LastActivity = DateTime.MinValue;
-            clientInfo.CanResumeDownload = true;
         }
 
         private void StopTimer(string ipAddress)
@@ -80,7 +70,9 @@ namespace ClientInfoLibrary
             if (!_clients.TryGetValue(ipAddress, out var clientInfo))
                 return;
 
+            Console.WriteLine($"Session for client({ipAddress}) is timeout");
             clientInfo.MarkInactive();
+
         }
     }
 }

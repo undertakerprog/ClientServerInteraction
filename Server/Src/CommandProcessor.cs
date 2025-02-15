@@ -1,4 +1,5 @@
 ﻿using System.Net.Sockets;
+using System.Text;
 using ClientInfoLibrary;
 
 namespace Server
@@ -13,7 +14,7 @@ namespace Server
             var parts = command.Split(' ', 3);
             var mainCommand = parts[0].ToUpper();
             var argument = parts.Length > 1 ? parts[1] : string.Empty;
-            var startByte = parts.Length > 2 && long.TryParse(parts[2], out var parsedStartByte) ? parsedStartByte : 0;
+
 
             var ipAddress = ((System.Net.IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
 
@@ -23,61 +24,52 @@ namespace Server
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
                 "UPLOAD" => UploadFile(argument, stream),
-                "DOWNLOAD" => DownloadFile(argument, stream, ipAddress, clientManager, startByte),
-                "FILE_RECEIVED" => HandleFileReceived(ipAddress, argument, clientManager),
+                "DOWNLOAD" => DownloadFile(argument, stream),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
         }
 
-        private static string HandleFileReceived(string ipAddress, string fileName, ClientManager clientManager)
-        {
-            clientManager.SetClientActive(ipAddress);
-            return string.Empty;
-        }
-
-        private static string DownloadFile(string fileName, NetworkStream stream, string ipAddress, ClientManager clientManager, long startByte = 0)
+        private static string DownloadFile(string fileName, NetworkStream stream)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(fileName))
+                {
                     return "Error: No file name provided.\r\n";
+                }
 
                 var filePath = Path.Combine(ServerDirectory, fileName);
                 if (!File.Exists(filePath))
+                {
                     return "Error: File not found.\r\n";
+                }
 
                 var fileInfo = new FileInfo(filePath);
                 var fileSize = fileInfo.Length;
+                var fileSizeBytes = BitConverter.GetBytes(fileSize);
 
-                clientManager.AddOrUpdateClient(ipAddress, fileName, startByte);
-
-                var sizeBytes = BitConverter.GetBytes(fileSize);
-                stream.Write(sizeBytes, 0, sizeBytes.Length);
+                stream.Write(fileSizeBytes, 0, fileSizeBytes.Length);
+                stream.Flush();
 
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-                fileStream.Seek(startByte, SeekOrigin.Begin);
+                var buffer = new byte[4096];
+                int bytesRead;
 
-                var buffer = new byte[1024];
-                var totalBytesSent = startByte;
-                var startTime = DateTime.Now;
-
-                while (totalBytesSent < fileSize)
+                while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
                 {
-                    var bytesRead = fileStream.Read(buffer, 0, buffer.Length);
                     stream.Write(buffer, 0, bytesRead);
-                    totalBytesSent += bytesRead;
-
-                    clientManager.AddOrUpdateClient(ipAddress, fileName, totalBytesSent);
+                    stream.Flush();
                 }
-                clientManager.ClearClientData(ipAddress);
+
                 return $"File {fileName} downloaded successfully.\r\n";
             }
-            catch (Exception ex)
+            catch
             {
-                return $"Error during file download: {ex.Message}\r\n";
+                return "Error during file download.\r\n";
             }
         }
+
 
         private static string UploadFile(string fileName, NetworkStream stream)
         {
@@ -117,7 +109,6 @@ namespace Server
                 var bitRate = receivedBytes / elapsedTime.TotalSeconds;
 
                 Console.WriteLine($"File received successfully: {fileName}");
-                Console.WriteLine($"Bit-rate: {bitRate:F2} bytes/second");
 
                 return $"File {fileName} uploaded successfully. Bit-rate: {bitRate:F2} bytes/second\r\n";
             }
