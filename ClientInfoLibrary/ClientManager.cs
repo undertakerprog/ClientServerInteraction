@@ -8,7 +8,7 @@ namespace ClientInfoLibrary
     {
         private readonly ConcurrentDictionary<string, ClientInfo> _clients = new();
         private readonly ConcurrentDictionary<string, Timer> _timers = new();
-        private const int TimeOutClient = 3000;
+        private const int TimeOutClient = 90000;
 
         public void AddOrUpdateClient(string ipAddress, string fileName)
         {

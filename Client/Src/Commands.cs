@@ -63,17 +63,16 @@ namespace Client.Src
             }
         }
 
-        private static void DownloadFile(string fileName, NetworkStream stream)
+        public static void DownloadFile(string fileName, NetworkStream stream)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(fileName))
                 {
-                    Console.WriteLine("Error: No file name provided.");
+                    Console.WriteLine("Error: File name not specified.");
                     return;
                 }
 
-                // Убедимся, что папка `ClientDirectory` существует
                 if (!Directory.Exists(ClientDirectory))
                 {
                     Directory.CreateDirectory(ClientDirectory);
@@ -82,12 +81,11 @@ namespace Client.Src
                 var command = $"DOWNLOAD {fileName}\r\n";
                 var commandBytes = Encoding.UTF8.GetBytes(command);
                 stream.Write(commandBytes, 0, commandBytes.Length);
-                stream.Flush();
 
                 var sizeBuffer = new byte[8];
                 if (!ReadExactly(stream, sizeBuffer, 8))
                 {
-                    Console.WriteLine("Error: Failed to read file size.");
+                    Console.WriteLine("Error: Could not read file size.");
                     return;
                 }
 
@@ -98,19 +96,26 @@ namespace Client.Src
                     return;
                 }
 
-                Console.WriteLine($"Receiving file: {fileName} ({fileSize} bytes)");
+                var flagBuffer = new byte[4];
+                if (!ReadExactly(stream, flagBuffer, 4) || Encoding.UTF8.GetString(flagBuffer) != "BEG!")
+                {
+                    Console.WriteLine("Error: Invalid start flag.");
+                    return;
+                }
+
+                Console.WriteLine($"Beginning start downloading the file: {fileName} ({fileSize} bytes)");
 
                 var savePath = Path.Combine(ClientDirectory, fileName);
                 using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write);
                 var receivedBytes = 0L;
-                var buffer = new byte[2048];
+                var buffer = new byte[4096];
 
                 while (receivedBytes < fileSize)
                 {
                     var bytesRead = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, fileSize - receivedBytes));
-                    if (bytesRead == 0)
+                    if (bytesRead <= 0)
                     {
-                        Console.WriteLine("Error: Connection lost during download.");
+                        Console.WriteLine("Error: Connection lost.");
                         return;
                     }
 
@@ -118,15 +123,20 @@ namespace Client.Src
                     receivedBytes += bytesRead;
                 }
 
-                Console.WriteLine($"Downloading file: {fileName} ({fileSize} bytes)");
+                if (!ReadExactly(stream, flagBuffer, 4) || Encoding.UTF8.GetString(flagBuffer) != "END!")
+                {
+                    Console.WriteLine("Error: Invalid transfer end flag.");
+                    return;
+                }
+
+                Console.WriteLine($"File {fileName} downloaded successfully ({fileSize} bytes).");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error downloading file: {ex.Message}");
             }
         }
-
-
+        
         private static bool ReadExactly(NetworkStream stream, byte[] buffer, int count)
         {
             var totalRead = 0;

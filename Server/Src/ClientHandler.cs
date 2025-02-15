@@ -16,10 +16,8 @@ namespace Server
             if (ClientManager.CanDownloadFile(ipAddress) && ClientManager.GetFileName(ipAddress) != "No File")
             {
                 var fileName = ClientManager.GetFileName(ipAddress) + "\r\n";
-                var fileNameBytes = Encoding.UTF8.GetBytes(fileName);
+                var fileNameBytes = Encoding.UTF8.GetBytes("RESUME " + fileName);
                 stream.Write(fileNameBytes, 0, fileNameBytes.Length);
-
-                AskClientToContinue(stream);
             }
             else
             {
@@ -51,19 +49,6 @@ namespace Server
 
             client.Close();
             Console.WriteLine("Client disconnected");
-        }
-
-        private static bool AskClientToContinue(NetworkStream stream)
-        {
-            const string message = "Do you want to continue? (yes/no)\r\n";
-            var messageBytes = Encoding.UTF8.GetBytes(message);
-            stream.Write(messageBytes, 0, messageBytes.Length);
-
-            var buffer = new byte[1024];
-            var bytesRead = stream.Read(buffer, 0, buffer.Length);
-            var response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim().ToLower();
-
-            return response == "yes";
         }
     }
 }

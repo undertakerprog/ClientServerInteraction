@@ -26,7 +26,8 @@ namespace Client.Src
                 {
                     Commands.ProcessCommand(command, stream);
 
-                    if (!Commands.IsExitCommand(command)) continue;
+                    if (!Commands.IsExitCommand(command))
+                        continue;
                     Console.WriteLine("Closing connection...");
                     break;
                 }
@@ -37,25 +38,17 @@ namespace Client.Src
             }
         }
 
-        private static bool ReceiveAndRespondToServerPrompt(NetworkStream stream)
+        private static void ReceiveAndRespondToServerPrompt(NetworkStream stream)
         {
             var buffer = new byte[1024];
             var bytesRead = stream.Read(buffer, 0, buffer.Length);
             var message = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
 
-            if (message == "skip")
-            {
-                return true;
-            }
+            if (!message.StartsWith("RESUME ")) return;
+            var fileName = message[7..].Trim();
+            Console.WriteLine($"An incomplete download was detected for file: {fileName}. Continue downloading...");
 
-            Console.WriteLine($"File available for download: {message}");
-            Console.Write("Enter your response (yes/no): ");
-            var response = Console.ReadLine()?.Trim().ToLower() ?? "no";
-
-            var responseBytes = Encoding.UTF8.GetBytes(response + "\r\n");
-            stream.Write(responseBytes, 0, responseBytes.Length);
-
-            return response == "yes";
+            Commands.DownloadFile(fileName, stream);
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Net.Sockets;
+using System.Text;
 using ClientInfoLibrary;
 
 namespace Server
@@ -34,46 +35,46 @@ namespace Server
             try
             {
                 if (string.IsNullOrWhiteSpace(fileName))
-                {
-                    return "Error: No file name provided.\r\n";
-                }
+                    return "Error: File name not specified.\r\n";
 
                 var filePath = Path.Combine(ServerDirectory, fileName);
                 if (!File.Exists(filePath))
-                {
                     return "Error: File not found.\r\n";
-                }
 
                 clientManager.AddOrUpdateClient(ipAddress, fileName);
 
                 var fileInfo = new FileInfo(filePath);
                 var fileSize = fileInfo.Length;
                 var fileSizeBytes = BitConverter.GetBytes(fileSize);
+                var startFlagBytes = "BEG!"u8.ToArray();
+                var endFlagBytes = "END!"u8.ToArray();
 
                 stream.Write(fileSizeBytes, 0, fileSizeBytes.Length);
-                stream.Flush();
+                stream.Write(startFlagBytes, 0, startFlagBytes.Length);
+                Console.WriteLine($"[SERVER] Sent file size: {fileSize} bytes");
 
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
                 var buffer = new byte[4096];
+                long sentBytes = 0;
                 int bytesRead;
 
                 while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     stream.Write(buffer, 0, bytesRead);
-                    clientManager.AddOrUpdateClient(ipAddress, fileName);
-                    stream.Flush();
+                    sentBytes += bytesRead;
                 }
 
-                clientManager.ClearClientData(ipAddress);
+                stream.Write(endFlagBytes, 0, endFlagBytes.Length);
+                Console.WriteLine("[SERVER] Transmission end flag sent");
 
+                clientManager.ClearClientData(ipAddress);
                 return $"File {fileName} downloaded successfully.\r\n";
             }
             catch
             {
-                return "Error during file download.\r\n";
+                return "Error sending file.\r\n";
             }
         }
-
 
         private static string UploadFile(string fileName, NetworkStream stream)
         {
