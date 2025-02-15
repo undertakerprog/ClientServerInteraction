@@ -8,7 +8,7 @@ namespace ClientInfoLibrary
     {
         private readonly ConcurrentDictionary<string, ClientInfo> _clients = new();
         private readonly ConcurrentDictionary<string, Timer> _timers = new();
-        private const int TimeOutClient = 90000;
+        private const int TimeOutClient = 3000;
 
         public void AddOrUpdateClient(string ipAddress, string fileName)
         {
@@ -23,11 +23,14 @@ namespace ClientInfoLibrary
             ResetTimer(ipAddress);
         }
 
-        public void SetClientActive(string ipAddress)
+        public void ClearClientData(string ipAddress)
         {
             if (!_clients.TryGetValue(ipAddress, out var clientInfo))
                 return;
-            clientInfo.MarkActive();
+            clientInfo.FileName = "No File";
+            clientInfo.LastActivity = DateTime.MinValue;
+            clientInfo.CanResumeDownload = true;
+
             StopTimer(ipAddress);
         }
 
@@ -72,7 +75,7 @@ namespace ClientInfoLibrary
 
             Console.WriteLine($"Session for client({ipAddress}) is timeout");
             clientInfo.MarkInactive();
-
+            ClearClientData(ipAddress);
         }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using System.Net.Sockets;
-using System.Text;
 using ClientInfoLibrary;
 
 namespace Server
@@ -24,13 +23,13 @@ namespace Server
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
                 "UPLOAD" => UploadFile(argument, stream),
-                "DOWNLOAD" => DownloadFile(argument, stream),
+                "DOWNLOAD" => DownloadFile(argument, stream, clientManager, ipAddress),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
         }
 
-        private static string DownloadFile(string fileName, NetworkStream stream)
+        private static string DownloadFile(string fileName, NetworkStream stream, ClientManager clientManager, string ipAddress)
         {
             try
             {
@@ -44,6 +43,8 @@ namespace Server
                 {
                     return "Error: File not found.\r\n";
                 }
+
+                clientManager.AddOrUpdateClient(ipAddress, fileName);
 
                 var fileInfo = new FileInfo(filePath);
                 var fileSize = fileInfo.Length;
@@ -59,8 +60,11 @@ namespace Server
                 while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     stream.Write(buffer, 0, bytesRead);
+                    clientManager.AddOrUpdateClient(ipAddress, fileName);
                     stream.Flush();
                 }
+
+                clientManager.ClearClientData(ipAddress);
 
                 return $"File {fileName} downloaded successfully.\r\n";
             }
