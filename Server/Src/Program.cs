@@ -46,7 +46,7 @@ namespace Server.Src
                 var ipAddress = clientEndPoint!.Split(':')[0];
                 Console.WriteLine($"[TCP] Client connected from {ipAddress}");
 
-                var clientHandler = new ClientHandler(client);
+                var clientHandler = new TcpClientHandler(client);
                 Task.Run(() => clientHandler.TcpHandleClient(ipAddress));
             }
         }
@@ -63,9 +63,8 @@ namespace Server.Src
                     var receivedMessage = Encoding.UTF8.GetString(result.Buffer).TrimEnd('\r', '\n');
                     var ipAddress = result.RemoteEndPoint.Address.ToString();
 
-                    Console.WriteLine(receivedMessage.StartsWith("CONNECTED")
-                        ? $"[UDP] Client connected from {ipAddress}"
-                        : $"[UDP] Received message from {ipAddress}: {receivedMessage}");
+                    var clientHandler = new UdpClientHandler(result.RemoteEndPoint, udpClient);
+                    Task.Run(() => clientHandler.HandleMessage(receivedMessage, ipAddress));
                 }
                 catch (Exception ex)
                 {

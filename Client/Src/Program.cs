@@ -17,7 +17,7 @@ namespace Client.Src
 
             try
             {
-                if (TryConnectTcp(serverIp!))
+                if (ConnectTcp(serverIp!))
                 {
                     return;
                 }
@@ -29,7 +29,7 @@ namespace Client.Src
             }
         }
 
-        private static bool TryConnectTcp(string serverIp)
+        private static bool ConnectTcp(string serverIp)
         {
             try
             {
@@ -49,27 +49,17 @@ namespace Client.Src
         private static void ConnectUdp(string serverIp)
         {
             using var udpClient = new UdpClient();
-            udpClient.Connect(serverIp, Port);
+            var serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), Port);
 
             var localEndPoint = udpClient.Client.LocalEndPoint as IPEndPoint;
             var clientIp = localEndPoint?.Address.ToString() ?? "UNKNOWN";
 
             var initialMessage = Encoding.UTF8.GetBytes($"CONNECTED {clientIp}");
-            udpClient.Send(initialMessage, initialMessage.Length);
+            udpClient.Send(initialMessage, initialMessage.Length, serverEndPoint);
 
             Console.WriteLine("Connected to server (UDP)");
 
-            while (true)
-            {
-                Console.Write("Enter message (or 'exit' to quit): ");
-                var message = Console.ReadLine();
-                if (message?.ToLower() == "exit")
-                    break;
-
-                if (message == null) continue;
-                var request = Encoding.UTF8.GetBytes(message);
-                udpClient.Send(request, request.Length);
-            }
+            CommunicateWithServer.Communicate(udpClient, serverEndPoint);
         }
     }
 }

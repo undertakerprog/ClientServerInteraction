@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using ClientInfoLibrary;
 
@@ -7,6 +8,22 @@ namespace Server
     public static class CommandProcessor
     {
         private static readonly string ServerDirectory = Path.Combine(Environment.CurrentDirectory, "ServerFiles");
+
+        public static string ProcessCommand(string command, IPEndPoint clientEndPoint, UdpClient udpClient)
+        {
+            var parts = command.Split(' ', 2);
+            var mainCommand = parts[0].ToUpper();
+            var argument = parts.Length > 1 ? parts[1] : string.Empty;
+
+            return mainCommand switch
+            {
+                "ECHO" => $"ECHO: {argument}\r\n",
+                "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
+                "LIST" => GetFileList(ServerDirectory),
+                "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
+                _ => "Unknown command\r\n"
+            };
+        }
 
         public static string ProcessCommand(string command, TcpClient client, ClientManager clientManager)
         {

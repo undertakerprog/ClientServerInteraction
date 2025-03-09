@@ -1,14 +1,37 @@
-﻿using System.Net.Sockets;
+﻿using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 namespace Client.Src
 {
     public class CommunicateWithServer
     {
-        public static void Communicate(NetworkStream stream)
+        public static void Communicate(object connection, IPEndPoint serverEndPoint = null!)
         {
-            ReceiveAndRespondToServerPrompt(stream);
+            switch (connection)
+            {
+                case NetworkStream tcpStream:
+                    ReceiveAndRespondToServerPrompt(tcpStream);
+                    HandleCommands(
+                        command => Commands.ProcessCommand(command, tcpStream, ref serverEndPoint),
+                        Commands.IsExitCommand
+                    );
+                    break;
 
+                case UdpClient udpClient:
+                    HandleCommands(
+                        command => Commands.ProcessCommand(command, udpClient, ref serverEndPoint),
+                        Commands.IsExitCommand
+                    );
+                    break;
+
+                default:
+                    throw new ArgumentException("Invalid connection type");
+            }
+        }
+
+        private static void HandleCommands(Action<string> processCommand, Func<string, bool> isExitCommand)
+        {
             while (true)
             {
                 Console.Write("Commands:\n" +
@@ -24,9 +47,9 @@ namespace Client.Src
 
                 try
                 {
-                    Commands.ProcessCommand(command, stream);
+                    processCommand(command);
 
-                    if (!Commands.IsExitCommand(command))
+                    if (!isExitCommand(command))
                         continue;
                     Console.WriteLine("Closing connection...");
                     break;

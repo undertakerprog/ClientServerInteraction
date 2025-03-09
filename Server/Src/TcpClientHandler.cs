@@ -4,13 +4,13 @@ using ClientInfoLibrary;
 
 namespace Server
 {
-    public class ClientHandler()
+    public class TcpClientHandler()
     {
         private readonly TcpClient? _tcpClient;
 
         public static readonly ClientManager ClientManager = new();
 
-        public ClientHandler(TcpClient client) : this()
+        public TcpClientHandler(TcpClient client) : this()
         {
             _tcpClient = client;
         }

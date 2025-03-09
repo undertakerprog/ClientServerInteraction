@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 namespace Client.Src
@@ -9,7 +10,7 @@ namespace Client.Src
         private static readonly string ClientDirectory = Path.Combine(AppContext.BaseDirectory, "ClientFiles");
         private static readonly object Lock = new();
 
-        public static void ProcessCommand(string command, NetworkStream stream)
+        public static void ProcessCommand(string command, object connection, ref IPEndPoint serverEndPoint)
         {
             lock (Lock)
             {
@@ -25,8 +26,8 @@ namespace Client.Src
                     case "CLOSE":
                     case "QUIT":
                     case "EXIT":
-                        SendCommand(stream, command);
-                        var response = ReceiveResponse(stream);
+                        SendCommand(connection, command, serverEndPoint);
+                        var response = ReceiveResponse(connection, ref serverEndPoint);
                         Console.WriteLine($"Server response: {response}");
                         break;
 
@@ -37,9 +38,12 @@ namespace Client.Src
                         }
                         else
                         {
-                            UploadFile(argument, stream);
-                            response = ReceiveResponse(stream);
-                            Console.WriteLine($"Server response: {response}");
+                            if (connection is NetworkStream stream)
+                                UploadFile(argument, stream);
+                            //else if (connection is UdpClient udpClient)
+                            //    UploadFile(argument, udpClient, serverEndPoint);
+                            else
+                                throw new ArgumentException("Invalid connection type");
                         }
                         break;
 
@@ -50,9 +54,12 @@ namespace Client.Src
                         }
                         else
                         {
-                            DownloadFile(argument, stream);
-                            var serverResponse = ReceiveResponse(stream);
-                            Console.WriteLine($"Server response: {serverResponse}");
+                            if (connection is NetworkStream stream)
+                                DownloadFile(argument, stream);
+                            //else if (connection is UdpClient udpClient)
+                            //    DownloadFile(argument, udpClient, serverEndPoint);
+                            else
+                                throw new ArgumentException("Invalid connection type");
                         }
                         break;
 
@@ -201,22 +208,48 @@ namespace Client.Src
             return upperCommand is "CLOSE" or "EXIT" or "QUIT";
         }
 
-        private static void SendCommand(NetworkStream stream, string command)
+        private static void SendCommand(object connection, string command, IPEndPoint serverEndPoint = null)
         {
             var commandBytes = Encoding.UTF8.GetBytes(command + "\r\n");
-            stream.Write(commandBytes, 0, commandBytes.Length);
+
+            switch (connection)
+            {
+                case NetworkStream stream:
+                    stream.Write(commandBytes, 0, commandBytes.Length);
+                    break;
+
+                case UdpClient udpClient:
+                    udpClient.Send(commandBytes, commandBytes.Length, serverEndPoint);
+                    break;
+
+                default:
+                    throw new ArgumentException("Invalid connection type");
+            }
         }
 
-        private static string ReceiveResponse(NetworkStream stream)
+        private static string ReceiveResponse(object connection, ref IPEndPoint serverEndPoint)
         {
-            var buffer = new byte[BufferSize];
             var response = string.Empty;
 
             try
             {
-                Thread.Sleep(50);
-                var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+                switch (connection)
+                {
+                    case NetworkStream stream:
+                        var buffer = new byte[BufferSize];
+                        Thread.Sleep(50);
+                        var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                        response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+                        break;
+
+                    case UdpClient udpClient:
+                        var responseBytes = udpClient.Receive(ref serverEndPoint);
+                        response = Encoding.UTF8.GetString(responseBytes).TrimEnd('\r', '\n');
+                        break;
+
+                    default:
+                        throw new ArgumentException("Invalid connection type");
+                }
             }
             catch (Exception ex)
             {
@@ -225,6 +258,5 @@ namespace Client.Src
 
             return response;
         }
-
     }
 }
