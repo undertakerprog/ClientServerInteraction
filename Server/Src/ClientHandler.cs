@@ -4,13 +4,20 @@ using ClientInfoLibrary;
 
 namespace Server
 {
-    public class ClientHandler(TcpClient client)
+    public class ClientHandler()
     {
+        private readonly TcpClient? _tcpClient;
+
         public static readonly ClientManager ClientManager = new();
 
-        public void HandleClient(string ipAddress)
+        public ClientHandler(TcpClient client) : this()
         {
-            var stream = client.GetStream();
+            _tcpClient = client;
+        }
+
+        public void TcpHandleClient(string ipAddress)
+        {
+            var stream = _tcpClient!.GetStream();
             var buffer = new byte[1024];
 
             if (ClientManager.CanDownloadFile(ipAddress) && ClientManager.GetFileName(ipAddress) != "No File")
@@ -34,9 +41,9 @@ namespace Server
                         break;
 
                     var request = Encoding.UTF8.GetString(buffer, 0, bytesRead).TrimEnd('\r', '\n');
-                    Console.WriteLine($"Received command: {request}");
+                    Console.WriteLine($"[TCP] Received command: {request}");
 
-                    var response = CommandProcessor.ProcessCommand(request, client, ClientManager);
+                    var response = CommandProcessor.ProcessCommand(request, _tcpClient, ClientManager);
                     var responseBytes = Encoding.UTF8.GetBytes(response + "\r\n");
                     stream.Write(responseBytes, 0, responseBytes.Length);
                 }
@@ -47,7 +54,7 @@ namespace Server
                 }
             }
 
-            client.Close();
+            _tcpClient.Close();
             Console.WriteLine("Client disconnected");
         }
     }
