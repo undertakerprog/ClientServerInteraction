@@ -27,8 +27,6 @@ namespace Client.Src
                     case "QUIT":
                     case "EXIT":
                         SendCommand(connection, command, serverEndPoint);
-                        var response = ReceiveResponse(connection, ref serverEndPoint);
-                        Console.WriteLine($"Server response: {response}");
                         break;
 
                     case "UPLOAD":
@@ -38,12 +36,17 @@ namespace Client.Src
                         }
                         else
                         {
-                            if (connection is NetworkStream stream)
-                                UploadFile(argument, stream);
-                            //else if (connection is UdpClient udpClient)
-                            //    UploadFile(argument, udpClient, serverEndPoint);
-                            else
-                                throw new ArgumentException("Invalid connection type");
+                            switch (connection)
+                            {
+                                case NetworkStream stream:
+                                    TcpUploadFile(argument, stream);
+                                    break;
+                                case UdpClient udpClient:
+                                    //UdpUploadFile(argument, udpClient, serverEndPoint);
+                                    break;
+                                default:
+                                    throw new ArgumentException("Invalid connection type");
+                            }
                         }
                         break;
 
@@ -54,12 +57,17 @@ namespace Client.Src
                         }
                         else
                         {
-                            if (connection is NetworkStream stream)
-                                DownloadFile(argument, stream);
-                            //else if (connection is UdpClient udpClient)
-                            //    DownloadFile(argument, udpClient, serverEndPoint);
-                            else
-                                throw new ArgumentException("Invalid connection type");
+                            switch (connection)
+                            {
+                                case NetworkStream stream:
+                                    TcpDownloadFile(argument, stream);
+                                    break;
+                                case UdpClient udpClient:
+                                    //UdpDownloadFile(argument, udpClient, serverEndPoint);
+                                    break;
+                                default:
+                                    throw new ArgumentException("Invalid connection type");
+                            }
                         }
                         break;
 
@@ -67,10 +75,12 @@ namespace Client.Src
                         Console.WriteLine("Unknown command. Available commands: ECHO <message>, TIME, CLOSE/QUIT/EXIT.");
                         break;
                 }
+
+                HandleServerResponse(connection, ref serverEndPoint);
             }
         }
 
-        public static void DownloadFile(string fileName, NetworkStream stream)
+        public static void TcpDownloadFile(string fileName, NetworkStream stream)
         {
             try
             {
@@ -115,7 +125,7 @@ namespace Client.Src
                 var savePath = Path.Combine(ClientDirectory, fileName);
                 using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write);
                 var receivedBytes = 0L;
-                var buffer = new byte[4096];
+                var buffer = new byte[BufferSize];
 
                 while (receivedBytes < fileSize)
                 {
@@ -135,8 +145,7 @@ namespace Client.Src
                     Console.WriteLine("Error: Invalid transfer end flag.");
                     return;
                 }
-
-                Console.WriteLine($"File {fileName} downloaded successfully ({fileSize} bytes).");
+                //Console.WriteLine($"File {fileName} downloaded successfully ({fileSize} bytes).");
             }
             catch (Exception ex)
             {
@@ -158,8 +167,7 @@ namespace Client.Src
             return true;
         }
 
-
-        private static void UploadFile(string filePath, NetworkStream stream)
+        private static void TcpUploadFile(string filePath, NetworkStream stream)
         {
             if (!Path.IsPathRooted(filePath))
             {
@@ -208,7 +216,7 @@ namespace Client.Src
             return upperCommand is "CLOSE" or "EXIT" or "QUIT";
         }
 
-        private static void SendCommand(object connection, string command, IPEndPoint serverEndPoint = null)
+        private static void SendCommand(object connection, string command, IPEndPoint serverEndPoint = null!)
         {
             var commandBytes = Encoding.UTF8.GetBytes(command + "\r\n");
 
@@ -240,6 +248,12 @@ namespace Client.Src
                         Thread.Sleep(50);
                         var bytesRead = stream.Read(buffer, 0, buffer.Length);
                         response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+
+                        while (stream.DataAvailable)
+                        {
+                            bytesRead = stream.Read(buffer, 0, buffer.Length);
+                            response += Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+                        }
                         break;
 
                     case UdpClient udpClient:
@@ -257,6 +271,12 @@ namespace Client.Src
             }
 
             return response;
+        }
+
+        private static void HandleServerResponse(object connection, ref IPEndPoint serverEndPoint)
+        {
+            var response = ReceiveResponse(connection, ref serverEndPoint);
+            Console.WriteLine($"Server response: {response}");
         }
     }
 }

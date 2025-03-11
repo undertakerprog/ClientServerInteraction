@@ -71,7 +71,7 @@ namespace Client.Src
             var fileName = message[7..].Trim();
             Console.WriteLine($"An incomplete download was detected for file: {fileName}. Continue downloading...");
 
-            Commands.DownloadFile(fileName, stream);
+            Commands.TcpDownloadFile(fileName, stream);
         }
     }
 }

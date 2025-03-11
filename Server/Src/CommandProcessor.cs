@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using ClientInfoLibrary;
 
 namespace Server
@@ -8,6 +7,7 @@ namespace Server
     public static class CommandProcessor
     {
         private static readonly string ServerDirectory = Path.Combine(Environment.CurrentDirectory, "ServerFiles");
+        private const int PacketSize = 1024;
 
         public static string ProcessCommand(string command, IPEndPoint clientEndPoint, UdpClient udpClient)
         {
@@ -20,6 +20,8 @@ namespace Server
                 "ECHO" => $"ECHO: {argument}\r\n",
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
+                //"DOWNLOAD" => UdpDownloadFile(argument, clientEndPoint, udpClient),
+                //"UPLOAD" => UdpUploadFile(argument, clientEndPoint, udpClient),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
@@ -33,21 +35,21 @@ namespace Server
             var argument = parts.Length > 1 ? parts[1] : string.Empty;
 
 
-            var ipAddress = ((System.Net.IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
+            var ipAddress = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
 
             return mainCommand switch
             {
                 "ECHO" => $"ECHO: {argument}\r\n",
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
-                "UPLOAD" => UploadFile(argument, stream),
-                "DOWNLOAD" => DownloadFile(argument, stream, clientManager, ipAddress),
+                "UPLOAD" => TcpUploadFile(argument, stream),
+                "DOWNLOAD" => TcpDownloadFile(argument, stream, clientManager, ipAddress),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
         }
 
-        private static string DownloadFile(string fileName, NetworkStream stream, ClientManager clientManager, string ipAddress)
+        private static string TcpDownloadFile(string fileName, NetworkStream stream, ClientManager clientManager, string ipAddress)
         {
             try
             {
@@ -71,14 +73,12 @@ namespace Server
                 Console.WriteLine($"[SERVER] Sent file size: {fileSize} bytes");
 
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-                var buffer = new byte[4096];
-                long sentBytes = 0;
+                var buffer = new byte[PacketSize];
                 int bytesRead;
 
                 while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     stream.Write(buffer, 0, bytesRead);
-                    sentBytes += bytesRead;
                 }
 
                 stream.Write(endFlagBytes, 0, endFlagBytes.Length);
@@ -93,7 +93,7 @@ namespace Server
             }
         }
 
-        private static string UploadFile(string fileName, NetworkStream stream)
+        private static string TcpUploadFile(string fileName, NetworkStream stream)
         {
             try
             {
@@ -117,7 +117,7 @@ namespace Server
 
                 using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
                 var receivedBytes = 0L;
-                var fileBuffer = new byte[1024];
+                var fileBuffer = new byte[PacketSize];
                 var startTime = DateTime.Now;
 
                 while (receivedBytes < fileSize)
@@ -164,6 +164,5 @@ namespace Server
                 return "Error: Could not access or create server directory.\r\n";
             }
         }
-
     }
 }
