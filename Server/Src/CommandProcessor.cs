@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using ClientInfoLibrary;
 
 namespace Server
@@ -7,7 +8,7 @@ namespace Server
     public static class CommandProcessor
     {
         private static readonly string ServerDirectory = Path.Combine(Environment.CurrentDirectory, "ServerFiles");
-        private const int PacketSize = 1024;
+        private const int PacketSize = 2048;
 
         public static string ProcessCommand(string command, IPEndPoint clientEndPoint, UdpClient udpClient)
         {
@@ -20,8 +21,8 @@ namespace Server
                 "ECHO" => $"ECHO: {argument}\r\n",
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
-                //"DOWNLOAD" => UdpDownloadFile(argument, clientEndPoint, udpClient),
-                //"UPLOAD" => UdpUploadFile(argument, clientEndPoint, udpClient),
+                "DOWNLOAD" => UdpDownloadFile(argument, clientEndPoint, udpClient),
+                //"UPLOAD" => UdpUploadFile
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
@@ -35,7 +36,7 @@ namespace Server
             var argument = parts.Length > 1 ? parts[1] : string.Empty;
 
 
-            var ipAddress = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
+            var ipAddress = ((IPEndPoint)client.Client.RemoteEndPoint!).Address.ToString();
 
             return mainCommand switch
             {
@@ -91,6 +92,62 @@ namespace Server
             {
                 return "Error sending file.\r\n";
             }
+        }
+
+        private static string UdpDownloadFile(string fileName, IPEndPoint clientEndPoint, UdpClient udpClient)
+        {
+            var filePath = Path.Combine(ServerDirectory, fileName);
+
+            if (!File.Exists(filePath))
+            {
+                return "Error: File not found\r\n";
+            }
+
+            var fileBytes = File.ReadAllBytes(filePath);
+            var totalPackets = (int)Math.Ceiling((double)fileBytes.Length / PacketSize);
+
+            udpClient.Send(Encoding.UTF8.GetBytes($"START {fileName} {fileBytes.Length} {totalPackets}"), clientEndPoint);
+
+            var sentPackets = new HashSet<int>();
+            if (sentPackets == null) throw new ArgumentNullException(nameof(sentPackets));
+
+            for (var i = 0; i < totalPackets; i++)
+            {
+                SendPacket(i, fileBytes, clientEndPoint, udpClient);
+                sentPackets.Add(i);
+            }
+
+            udpClient.Client.ReceiveTimeout = 2000;
+            try
+            {
+                var remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                var buffer = udpClient.Receive(ref remoteEndPoint);
+                var lostPackets = Encoding.UTF8.GetString(buffer).Split(',').Select(int.Parse).ToList();
+
+                foreach (var packetNum in lostPackets)
+                {
+                    SendPacket(packetNum, fileBytes, clientEndPoint, udpClient);
+                }
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("No lost packets reported.");
+            }
+
+            udpClient.Send("END"u8, clientEndPoint);
+            return "File transfer complete\r\n";
+        }
+
+        private static void SendPacket(int packetNum, byte[] fileBytes, IPEndPoint clientEndPoint, UdpClient udpClient)
+        {
+            var offset = packetNum * PacketSize;
+            var remaining = Math.Min(PacketSize, fileBytes.Length - offset);
+            var packet = new byte[remaining + 4];
+
+            BitConverter.GetBytes(packetNum).CopyTo(packet, 0);
+            Array.Copy(fileBytes, offset, packet, 4, remaining);
+
+            udpClient.Send(packet, packet.Length, clientEndPoint);
         }
 
         private static string TcpUploadFile(string fileName, NetworkStream stream)

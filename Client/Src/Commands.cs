@@ -6,7 +6,7 @@ namespace Client.Src
 {
     public class Commands
     {
-        private const int BufferSize = 1024;
+        private const int PacketSize = 1024;
         private static readonly string ClientDirectory = Path.Combine(AppContext.BaseDirectory, "ClientFiles");
         private static readonly object Lock = new();
 
@@ -42,7 +42,7 @@ namespace Client.Src
                                     TcpUploadFile(argument, stream);
                                     break;
                                 case UdpClient udpClient:
-                                    //UdpUploadFile(argument, udpClient, serverEndPoint);
+                                    //UdpUploadFile
                                     break;
                                 default:
                                     throw new ArgumentException("Invalid connection type");
@@ -63,7 +63,7 @@ namespace Client.Src
                                     TcpDownloadFile(argument, stream);
                                     break;
                                 case UdpClient udpClient:
-                                    //UdpDownloadFile(argument, udpClient, serverEndPoint);
+                                    UdpDownloadFile(argument, udpClient, serverEndPoint);
                                     break;
                                 default:
                                     throw new ArgumentException("Invalid connection type");
@@ -125,7 +125,7 @@ namespace Client.Src
                 var savePath = Path.Combine(ClientDirectory, fileName);
                 using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write);
                 var receivedBytes = 0L;
-                var buffer = new byte[BufferSize];
+                var buffer = new byte[PacketSize];
 
                 while (receivedBytes < fileSize)
                 {
@@ -140,19 +140,96 @@ namespace Client.Src
                     receivedBytes += bytesRead;
                 }
 
-                if (!ReadExactly(stream, flagBuffer, 4) || Encoding.UTF8.GetString(flagBuffer) != "END!")
-                {
-                    Console.WriteLine("Error: Invalid transfer end flag.");
-                    return;
-                }
-                //Console.WriteLine($"File {fileName} downloaded successfully ({fileSize} bytes).");
+                if (ReadExactly(stream, flagBuffer, 4) && Encoding.UTF8.GetString(flagBuffer) == "END!") return;
+                Console.WriteLine("Error: Invalid transfer end flag.");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error downloading file: {ex.Message}");
             }
         }
-        
+
+        private static void UdpDownloadFile(string fileName, UdpClient udpClient, IPEndPoint serverEndPoint)
+        {
+            var filePath = Path.Combine(ClientDirectory, fileName);
+            Directory.CreateDirectory(ClientDirectory);
+
+            udpClient.Send(Encoding.UTF8.GetBytes($"DOWNLOAD {fileName}"), serverEndPoint);
+
+            var remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            var buffer = udpClient.Receive(ref remoteEndPoint);
+            var response = Encoding.UTF8.GetString(buffer);
+
+            if (response.StartsWith("Error"))
+            {
+                Console.WriteLine(response);
+                return;
+            }
+
+            if (!response.StartsWith("START"))
+            {
+                Console.WriteLine("Unexpected response from server.");
+                return;
+            }
+
+            var parts = response.Split(' ');
+            var totalSize = int.Parse(parts[2]);
+            var totalPackets = int.Parse(parts[3]);
+
+            Console.WriteLine($"Receiving {fileName} ({totalSize} bytes, {totalPackets} packets)...");
+
+            using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write);
+            var receivedPackets = new HashSet<int>();
+
+            while (receivedPackets.Count < totalPackets)
+            {
+                try
+                {
+                    buffer = udpClient.Receive(ref remoteEndPoint);
+
+                    if (buffer.Length < 4)
+                        continue;
+
+                    var packetNum = BitConverter.ToInt32(buffer, 0);
+
+                    if (receivedPackets.Contains(packetNum)) continue;
+                    fs.Seek(packetNum * PacketSize, SeekOrigin.Begin);
+                    fs.Write(buffer, 4, buffer.Length - 4);
+                    receivedPackets.Add(packetNum);
+                }
+                catch (SocketException)
+                {
+                    break;
+                }
+            }
+
+            var lostPackets = Enumerable.Range(0, totalPackets).Except(receivedPackets).ToList();
+
+            if (lostPackets.Count > 0)
+            {
+                Console.WriteLine($"Lost {lostPackets.Count} packets. Requesting retransmission...");
+                udpClient.Send(Encoding.UTF8.GetBytes(string.Join(",", lostPackets)), serverEndPoint);
+
+                while (receivedPackets.Count < totalPackets)
+                {
+                    buffer = udpClient.Receive(ref remoteEndPoint);
+                    if (buffer.Length < 4)
+                        continue;
+
+                    var packetNum = BitConverter.ToInt32(buffer, 0);
+                    if (receivedPackets.Contains(packetNum)) continue;
+                    fs.Seek(packetNum * PacketSize, SeekOrigin.Begin);
+                    fs.Write(buffer, 4, buffer.Length - 4);
+                    receivedPackets.Add(packetNum);
+                }
+            }
+
+            buffer = udpClient.Receive(ref remoteEndPoint);
+            Console.WriteLine(Encoding.UTF8.GetString(buffer) == "END"
+                ? $"Download complete: {filePath}"
+                : "Transfer error.");
+        }
+
         private static bool ReadExactly(NetworkStream stream, byte[] buffer, int count)
         {
             var totalRead = 0;
@@ -244,7 +321,7 @@ namespace Client.Src
                 switch (connection)
                 {
                     case NetworkStream stream:
-                        var buffer = new byte[BufferSize];
+                        var buffer = new byte[PacketSize];
                         Thread.Sleep(50);
                         var bytesRead = stream.Read(buffer, 0, buffer.Length);
                         response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
