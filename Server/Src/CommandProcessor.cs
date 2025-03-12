@@ -22,7 +22,7 @@ namespace Server
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
                 "DOWNLOAD" => UdpDownloadFile(argument, clientEndPoint, udpClient),
-                "UPLOAD" => UdpUploadFile(argument, clientEndPoint, udpClient),
+                //"UPLOAD" => UdpUploadFile(argument, clientEndPoint, udpClient),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
@@ -122,45 +122,6 @@ namespace Server
 
             udpClient.Send("END"u8, clientEndPoint);
             return "File transfer complete\r\n";
-        }
-
-        private static string UdpUploadFile(string fileName, IPEndPoint clientEndPoint, UdpClient udpClient)
-        {
-            var filePath = Path.Combine(ServerDirectory, fileName);
-
-            var remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
-            var buffer = udpClient.Receive(ref remoteEndPoint);
-            var request = Encoding.UTF8.GetString(buffer).Split(' ');
-
-            if (request.Length < 4 || request[0] != "UPLOAD")
-            {
-                return "Error: Invalid request\r\n";
-            }
-
-            var totalSize = int.Parse(request[2]);
-            var totalPackets = int.Parse(request[3]);
-
-            udpClient.Send("READY"u8, clientEndPoint);
-
-            Console.WriteLine($"Receiving {fileName} ({totalSize} bytes, {totalPackets} packets)...");
-
-            using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-            {
-                for (var i = 0; i < totalPackets; i++)
-                {
-                    buffer = udpClient.Receive(ref remoteEndPoint);
-                    fs.Write(buffer, 0, buffer.Length);
-                }
-            }
-
-            buffer = udpClient.Receive(ref remoteEndPoint);
-            if (Encoding.UTF8.GetString(buffer) != "END")
-            {
-                return "Error: Transfer incomplete\r\n";
-            }
-
-            udpClient.Send("SUCCESS"u8, clientEndPoint);
-            return "File upload complete\r\n";
         }
 
         private static string TcpUploadFile(string fileName, NetworkStream stream)
