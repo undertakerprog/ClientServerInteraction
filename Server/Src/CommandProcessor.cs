@@ -8,7 +8,7 @@ namespace Server
     public static class CommandProcessor
     {
         private static readonly string ServerDirectory = Path.Combine(Environment.CurrentDirectory, "ServerFiles");
-        private const int PacketSize = 2048;
+        private const int PacketSize = 1024;
 
         public static string ProcessCommand(string command, IPEndPoint clientEndPoint, UdpClient udpClient)
         {
@@ -22,7 +22,7 @@ namespace Server
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
                 "DOWNLOAD" => UdpDownloadFile(argument, clientEndPoint, udpClient),
-                //"UPLOAD" => UdpUploadFile
+                "UPLOAD" => UdpUploadFile(argument, clientEndPoint, udpClient),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
@@ -108,46 +108,59 @@ namespace Server
 
             udpClient.Send(Encoding.UTF8.GetBytes($"START {fileName} {fileBytes.Length} {totalPackets}"), clientEndPoint);
 
-            var sentPackets = new HashSet<int>();
-            if (sentPackets == null) throw new ArgumentNullException(nameof(sentPackets));
-
             for (var i = 0; i < totalPackets; i++)
             {
-                SendPacket(i, fileBytes, clientEndPoint, udpClient);
-                sentPackets.Add(i);
-            }
+                var offset = i * PacketSize;
+                var remaining = Math.Min(PacketSize, fileBytes.Length - offset);
+                var packet = new byte[remaining];
 
-            udpClient.Client.ReceiveTimeout = 2000;
-            try
-            {
-                var remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
-                var buffer = udpClient.Receive(ref remoteEndPoint);
-                var lostPackets = Encoding.UTF8.GetString(buffer).Split(',').Select(int.Parse).ToList();
+                Array.Copy(fileBytes, offset, packet, 0, remaining);
+                udpClient.Send(packet, packet.Length, clientEndPoint);
 
-                foreach (var packetNum in lostPackets)
-                {
-                    SendPacket(packetNum, fileBytes, clientEndPoint, udpClient);
-                }
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("No lost packets reported.");
+                Thread.Sleep(10);
             }
 
             udpClient.Send("END"u8, clientEndPoint);
             return "File transfer complete\r\n";
         }
 
-        private static void SendPacket(int packetNum, byte[] fileBytes, IPEndPoint clientEndPoint, UdpClient udpClient)
+        private static string UdpUploadFile(string fileName, IPEndPoint clientEndPoint, UdpClient udpClient)
         {
-            var offset = packetNum * PacketSize;
-            var remaining = Math.Min(PacketSize, fileBytes.Length - offset);
-            var packet = new byte[remaining + 4];
+            var filePath = Path.Combine(ServerDirectory, fileName);
 
-            BitConverter.GetBytes(packetNum).CopyTo(packet, 0);
-            Array.Copy(fileBytes, offset, packet, 4, remaining);
+            var remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            var buffer = udpClient.Receive(ref remoteEndPoint);
+            var request = Encoding.UTF8.GetString(buffer).Split(' ');
 
-            udpClient.Send(packet, packet.Length, clientEndPoint);
+            if (request.Length < 4 || request[0] != "UPLOAD")
+            {
+                return "Error: Invalid request\r\n";
+            }
+
+            var totalSize = int.Parse(request[2]);
+            var totalPackets = int.Parse(request[3]);
+
+            udpClient.Send("READY"u8, clientEndPoint);
+
+            Console.WriteLine($"Receiving {fileName} ({totalSize} bytes, {totalPackets} packets)...");
+
+            using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            {
+                for (var i = 0; i < totalPackets; i++)
+                {
+                    buffer = udpClient.Receive(ref remoteEndPoint);
+                    fs.Write(buffer, 0, buffer.Length);
+                }
+            }
+
+            buffer = udpClient.Receive(ref remoteEndPoint);
+            if (Encoding.UTF8.GetString(buffer) != "END")
+            {
+                return "Error: Transfer incomplete\r\n";
+            }
+
+            udpClient.Send("SUCCESS"u8, clientEndPoint);
+            return "File upload complete\r\n";
         }
 
         private static string TcpUploadFile(string fileName, NetworkStream stream)
