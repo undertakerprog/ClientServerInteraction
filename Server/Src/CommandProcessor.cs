@@ -149,17 +149,20 @@ namespace Server
 
                     if (buffer.Length == eofMarker.Length && buffer.SequenceEqual(eofMarker))
                     {
-                        Console.WriteLine("[UDP] Received EOF marker. Stopping reception.");
                         break;
                     }
 
                     fileStream.Write(buffer, 0, buffer.Length);
-                    Console.WriteLine($"[UDP] Received {buffer.Length} bytes and wrote to file.");
                 }
             }
 
             Console.WriteLine($"File received successfully: {fileName}");
-            return $"UPLOAD_OK {fileName}";
+
+            var uploadOkMessage = $"UPLOAD_OK {fileName}";
+            var uploadOkBytes = Encoding.UTF8.GetBytes(uploadOkMessage);
+            udpClient.Send(uploadOkBytes, uploadOkBytes.Length, clientEndPoint);
+
+            return uploadOkMessage;
         }
 
         private static string TcpUploadFile(string fileName, NetworkStream stream)

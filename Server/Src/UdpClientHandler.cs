@@ -6,7 +6,7 @@ namespace Server.Src
 {
     public class UdpClientHandler(IPEndPoint clientEndPoint, UdpClient udpClient)
     {
-        public void HandleMessage(string message, string ipAddress)
+        public static void HandleMessage(string message, string ipAddress, IPEndPoint clientEndPoint, UdpClient udpClient)
         {
             if (message.StartsWith("CONNECTED"))
             {

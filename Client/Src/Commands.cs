@@ -230,12 +230,10 @@ namespace Client.Src
             while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
             {
                 udpClient.Send(buffer, bytesRead, serverEndPoint);
-                Console.WriteLine($"[UDP] Sent {bytesRead} bytes");
             }
 
             var eofMarker = "EOF"u8.ToArray();
             udpClient.Send(eofMarker, eofMarker.Length, serverEndPoint);
-            Console.WriteLine("[UDP] Sent EOF marker.");
 
             response = udpClient.Receive(ref remoteEndPoint);
             responseMessage = Encoding.UTF8.GetString(response);
@@ -243,7 +241,6 @@ namespace Client.Src
                 ? $"Upload complete: {fileName}"
                 : "Error: Server did not confirm file upload.");
         }
-
 
         private static void TcpUploadFile(string filePath, NetworkStream stream)
         {

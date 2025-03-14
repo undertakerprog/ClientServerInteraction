@@ -59,12 +59,12 @@ namespace Server.Src
             {
                 try
                 {
-                    var result = udpClient.ReceiveAsync().Result;
-                    var receivedMessage = Encoding.UTF8.GetString(result.Buffer).TrimEnd('\r', '\n');
-                    var ipAddress = result.RemoteEndPoint.Address.ToString();
+                    var remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                    var buffer = udpClient.Receive(ref remoteEndPoint);
+                    var receivedMessage = Encoding.UTF8.GetString(buffer).TrimEnd('\r', '\n');
+                    var ipAddress = remoteEndPoint.Address.ToString();
 
-                    var clientHandler = new UdpClientHandler(result.RemoteEndPoint, udpClient);
-                    Task.Run(() => clientHandler.HandleMessage(receivedMessage, ipAddress));
+                    UdpClientHandler.HandleMessage(receivedMessage, ipAddress, remoteEndPoint, udpClient);
                 }
                 catch (Exception ex)
                 {

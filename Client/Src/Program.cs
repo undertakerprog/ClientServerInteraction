@@ -48,8 +48,17 @@ namespace Client.Src
 
         private static void ConnectUdp(string serverIp)
         {
+            Console.WriteLine($"\"{serverIp}\"");
+
             using var udpClient = new UdpClient();
-            var serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), Port);
+
+            if (IPAddress.TryParse(serverIp, out var parsedAddress) == false)
+            {
+                var addresses = Dns.GetHostAddresses(serverIp);
+                parsedAddress = addresses[1];
+            }
+
+            var serverEndPoint = new IPEndPoint(parsedAddress, Port);
 
             var localEndPoint = udpClient.Client.LocalEndPoint as IPEndPoint;
             var clientIp = localEndPoint?.Address.ToString() ?? "UNKNOWN";
