@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -12,21 +13,59 @@ namespace Client.Src
         {
             Console.OutputEncoding = Encoding.UTF8;
 
-            Console.Write("Enter server IP: ");
-            var serverIp = Console.ReadLine()?.Trim();
+            Console.Write("Enter server IP in (format 8.8.8.8 -tcp) or (8.8.8.8): ");
+            var input = Console.ReadLine()?.Trim();
 
             try
             {
-                if (ConnectTcp(serverIp!))
+                Debug.Assert(input != null, nameof(input) + " != null");
+                var (serverIp, protocol) = ParseInput(input);
+
+                if (!string.IsNullOrEmpty(protocol))
+                {
+                    switch (protocol)
+                    {
+                        case "-tcp" when ConnectTcp(serverIp):
+                            return;
+                        case "-tcp":
+                            Console.WriteLine("Failed to connect via TCP.");
+                            break;
+                        case "-udp":
+                            ConnectUdp(serverIp);
+                            return;
+                        default:
+                            Console.WriteLine("Invalid protocol. Use -tcp or -udp.");
+                            return;
+                    }
+                }
+
+                if (ConnectTcp(serverIp))
                 {
                     return;
                 }
-                ConnectUdp(serverIp!);
+                ConnectUdp(serverIp);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
             }
+        }
+
+        private static (string serverIp, string protocol) ParseInput(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                throw new ArgumentException("Input cannot be empty.");
+            }
+
+            var parts = input.Split([' '], StringSplitOptions.RemoveEmptyEntries);
+
+            return parts.Length switch
+            {
+                1 => (parts[0], string.Empty),
+                2 => (parts[0], parts[1].ToLower()),
+                _ => throw new ArgumentException("Invalid input format. Use: address -protocol(8.8.8.8 -tcp)")
+            };
         }
 
         private static bool ConnectTcp(string serverIp)
@@ -48,8 +87,6 @@ namespace Client.Src
 
         private static void ConnectUdp(string serverIp)
         {
-            Console.WriteLine($"\"{serverIp}\"");
-
             using var udpClient = new UdpClient();
 
             if (IPAddress.TryParse(serverIp, out var parsedAddress) == false)
