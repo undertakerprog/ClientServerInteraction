@@ -21,29 +21,21 @@ namespace Client.Src
                 Debug.Assert(input != null, nameof(input) + " != null");
                 var (serverIp, protocol) = ParseInput(input);
 
-                if (!string.IsNullOrEmpty(protocol))
+                if (string.IsNullOrEmpty(protocol)) return;
+                switch (protocol)
                 {
-                    switch (protocol)
-                    {
-                        case "-tcp" when ConnectTcp(serverIp):
-                            return;
-                        case "-tcp":
-                            Console.WriteLine("Failed to connect via TCP.");
-                            break;
-                        case "-udp":
-                            ConnectUdp(serverIp);
-                            return;
-                        default:
-                            Console.WriteLine("Invalid protocol. Use -tcp or -udp.");
-                            return;
-                    }
+                    case "-tcp" when ConnectTcp(serverIp):
+                        return;
+                    case "-tcp":
+                        Console.WriteLine("Failed to connect via TCP.");
+                        break;
+                    case "-udp":
+                        ConnectUdp(serverIp);
+                        return;
+                    default:
+                        Console.WriteLine("Invalid protocol. Use -tcp or -udp.");
+                        return;
                 }
-
-                if (ConnectTcp(serverIp))
-                {
-                    return;
-                }
-                ConnectUdp(serverIp);
             }
             catch (Exception ex)
             {
@@ -76,14 +68,31 @@ namespace Client.Src
                 Console.WriteLine("Connected to server (TCP)");
 
                 var stream = client.GetStream();
-                CommunicateWithServer.Communicate(stream);
-                return true;
+
+                var buffer = new byte[1024];
+                var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                var initialMessage = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+
+                switch (initialMessage)
+                {
+                    case "skip":
+                        Console.WriteLine("Server rejected the connection. Exiting...");
+                        return false;
+                    case "accept":
+                        Console.WriteLine("Server accepted the connection.");
+                        CommunicateWithServer.Communicate(stream);
+                        return true;
+                    default:
+                        Console.WriteLine("Unknown response from server. Exiting...");
+                        return false;
+                }
             }
             catch
             {
                 return false;
             }
         }
+
 
         private static void ConnectUdp(string serverIp)
         {
