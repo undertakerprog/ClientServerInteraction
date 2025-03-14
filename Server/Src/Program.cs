@@ -46,8 +46,7 @@ namespace Server.Src
                 var ipAddress = clientEndPoint!.Split(':')[0];
                 Console.WriteLine($"[TCP] Client connected from {ipAddress}");
 
-                var clientHandler = new TcpClientHandler(client);
-                Task.Run(() => clientHandler.TcpHandleClient(ipAddress));
+                Task.Run(() => TcpClientHandler.HandleClient(client, ipAddress));
             }
         }
 
