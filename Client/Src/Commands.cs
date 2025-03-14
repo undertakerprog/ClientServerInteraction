@@ -42,7 +42,7 @@ namespace Client.Src
                                     TcpUploadFile(argument, stream);
                                     break;
                                 case UdpClient udpClient:
-                                    //UdpUploadFile(argument, udpClient, serverEndPoint);
+                                    UdpUploadFile(argument, udpClient, serverEndPoint);
                                     break;
                                 default:
                                     throw new ArgumentException("Invalid connection type");
@@ -192,6 +192,58 @@ namespace Client.Src
                 ? $"Download complete: {fileName}"
                 : "Transfer error.");
         }
+
+        private static void UdpUploadFile(string filePath, UdpClient udpClient, IPEndPoint serverEndPoint)
+        {
+            if (!Path.IsPathRooted(filePath))
+            {
+                filePath = Path.Combine(ClientDirectory, filePath);
+            }
+
+            if (!File.Exists(filePath))
+            {
+                Console.WriteLine("Error: File not found.");
+                return;
+            }
+
+            var fileName = Path.GetFileName(filePath);
+            var command = $"UPLOAD {fileName}";
+            var commandData = Encoding.UTF8.GetBytes(command);
+            udpClient.Send(commandData, commandData.Length, serverEndPoint);
+
+            var remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            var response = udpClient.Receive(ref remoteEndPoint);
+            var responseMessage = Encoding.UTF8.GetString(response);
+
+            if (responseMessage != "READY")
+            {
+                Console.WriteLine("Error: Server is not ready to receive the file.");
+                return;
+            }
+
+            Console.WriteLine($"Uploading {fileName}...");
+
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            var buffer = new byte[PacketSize];
+            int bytesRead;
+
+            while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                udpClient.Send(buffer, bytesRead, serverEndPoint);
+                Console.WriteLine($"[UDP] Sent {bytesRead} bytes");
+            }
+
+            var eofMarker = "EOF"u8.ToArray();
+            udpClient.Send(eofMarker, eofMarker.Length, serverEndPoint);
+            Console.WriteLine("[UDP] Sent EOF marker.");
+
+            response = udpClient.Receive(ref remoteEndPoint);
+            responseMessage = Encoding.UTF8.GetString(response);
+            Console.WriteLine(responseMessage.StartsWith("UPLOAD_OK")
+                ? $"Upload complete: {fileName}"
+                : "Error: Server did not confirm file upload.");
+        }
+
 
         private static void TcpUploadFile(string filePath, NetworkStream stream)
         {

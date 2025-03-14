@@ -21,8 +21,8 @@ namespace Server
                 "ECHO" => $"ECHO: {argument}\r\n",
                 "TIME" => $"Server time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n",
                 "LIST" => GetFileList(ServerDirectory),
+                "UPLOAD" => UdpUploadFile(argument, udpClient, clientEndPoint),
                 "DOWNLOAD" => UdpDownloadFile(argument, clientEndPoint, udpClient),
-                //"UPLOAD" => UdpUploadFile(argument, clientEndPoint, udpClient),
                 "CLOSE" or "EXIT" or "QUIT" => "Connection closed\r\n",
                 _ => "Unknown command\r\n"
             };
@@ -122,6 +122,44 @@ namespace Server
 
             udpClient.Send("END"u8, clientEndPoint);
             return "File transfer complete\r\n";
+        }
+
+        private static string UdpUploadFile(string fileName, UdpClient udpClient, IPEndPoint clientEndPoint)
+        {
+            var filePath = Path.Combine(ServerDirectory, fileName);
+
+            if (!Directory.Exists(ServerDirectory))
+            {
+                Directory.CreateDirectory(ServerDirectory);
+            }
+
+            var readyMessage = "READY"u8.ToArray();
+            udpClient.Send(readyMessage, readyMessage.Length, clientEndPoint);
+
+            var remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            var eofMarker = "EOF"u8.ToArray();
+
+            Console.WriteLine($"[UDP] Receiving file: {fileName}");
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            {
+                while (true)
+                {
+                    var buffer = udpClient.Receive(ref remoteEndPoint);
+
+                    if (buffer.Length == eofMarker.Length && buffer.SequenceEqual(eofMarker))
+                    {
+                        Console.WriteLine("[UDP] Received EOF marker. Stopping reception.");
+                        break;
+                    }
+
+                    fileStream.Write(buffer, 0, buffer.Length);
+                    Console.WriteLine($"[UDP] Received {buffer.Length} bytes and wrote to file.");
+                }
+            }
+
+            Console.WriteLine($"File received successfully: {fileName}");
+            return $"UPLOAD_OK {fileName}";
         }
 
         private static string TcpUploadFile(string fileName, NetworkStream stream)
