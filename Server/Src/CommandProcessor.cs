@@ -106,6 +106,8 @@ namespace Server
             var fileBytes = File.ReadAllBytes(filePath);
             var totalPackets = (int)Math.Ceiling((double)fileBytes.Length / PacketSize);
 
+            var startTime = DateTime.Now;
+
             udpClient.Send(Encoding.UTF8.GetBytes($"START {fileName} {fileBytes.Length} {totalPackets}"), clientEndPoint);
 
             for (var i = 0; i < totalPackets; i++)
@@ -121,7 +123,12 @@ namespace Server
             }
 
             udpClient.Send("END"u8, clientEndPoint);
-            return "File transfer complete\r\n";
+
+            var endTime = DateTime.Now;
+            var transferTime = (endTime - startTime).TotalSeconds;
+            var bitrate = (fileBytes.Length * 8) / transferTime / 1024;
+
+            return $"File transfer complete\r\nTime: {transferTime:F2} seconds\r\nBitrate: {bitrate:F2} kbps\r\n";
         }
 
         private static string UdpUploadFile(string fileName, UdpClient udpClient, IPEndPoint clientEndPoint)
@@ -141,6 +148,8 @@ namespace Server
 
             Console.WriteLine($"[UDP] Receiving file: {fileName}");
 
+            var startTime = DateTime.Now;
+
             using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
             {
                 while (true)
@@ -156,7 +165,15 @@ namespace Server
                 }
             }
 
+            var endTime = DateTime.Now;
+            var transferTime = (endTime - startTime).TotalSeconds;
+
+            var fileInfo = new FileInfo(filePath);
+            var fileSize = fileInfo.Length;
+            var bitrate = (fileSize * 8) / transferTime / 1024;
+
             Console.WriteLine($"File received successfully: {fileName}");
+            Console.WriteLine($"Time: {transferTime:F2} seconds, Bitrate: {bitrate:F2} kbps");
 
             var uploadOkMessage = $"UPLOAD_OK {fileName}";
             var uploadOkBytes = Encoding.UTF8.GetBytes(uploadOkMessage);

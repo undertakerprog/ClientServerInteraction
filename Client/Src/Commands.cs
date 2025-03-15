@@ -178,6 +178,8 @@ namespace Client.Src
 
             Console.WriteLine($"Receiving {fileName} ({totalSize} bytes, {totalPackets} packets)...");
 
+            var startTime = DateTime.Now;
+
             using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
             {
                 for (var i = 0; i < totalPackets; i++)
@@ -187,9 +189,13 @@ namespace Client.Src
                 }
             }
 
+            var endTime = DateTime.Now;
+            var transferTime = (endTime - startTime).TotalSeconds;
+            var bitrate = (totalSize * 8) / transferTime / 1024;
+
             buffer = udpClient.Receive(ref remoteEndPoint);
             Console.WriteLine(Encoding.UTF8.GetString(buffer) == "END"
-                ? $"Download complete: {fileName}"
+                ? $"Download complete: {fileName}\r\nTime: {transferTime:F2} seconds\r\nBitrate: {bitrate:F2} kbps"
                 : "Transfer error.");
         }
 
@@ -223,6 +229,8 @@ namespace Client.Src
 
             Console.WriteLine($"Uploading {fileName}...");
 
+            var startTime = DateTime.Now;
+
             using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
             var buffer = new byte[PacketSize];
             int bytesRead;
@@ -235,10 +243,17 @@ namespace Client.Src
             var eofMarker = "EOF"u8.ToArray();
             udpClient.Send(eofMarker, eofMarker.Length, serverEndPoint);
 
+            var endTime = DateTime.Now;
+            var transferTime = (endTime - startTime).TotalSeconds;
+
+            var fileInfo = new FileInfo(filePath);
+            var fileSize = fileInfo.Length;
+            var bitrate = (fileSize * 8) / transferTime / 1024;
+
             response = udpClient.Receive(ref remoteEndPoint);
             responseMessage = Encoding.UTF8.GetString(response);
             Console.WriteLine(responseMessage.StartsWith("UPLOAD_OK")
-                ? $"Upload complete: {fileName}"
+                ? $"Upload complete: {fileName}\r\nTime: {transferTime:F2} seconds, Bitrate: {bitrate:F2} kbps"
                 : "Error: Server did not confirm file upload.");
         }
 
